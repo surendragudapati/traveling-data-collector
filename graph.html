@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Trip Recording & Transport Mode Analytics</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+  <!-- SheetJS library for Excel parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+      color: #333;
+
+      /* Background image */
+      background: url('https://media.istockphoto.com/id/1415019639/vector/data-analytics-statistics-pie-chart-abstract-background.jpg?s=612x612&w=0&k=20&c=FLygOTsGsD4Xzh7hbr_BoAetkbyOxvyf7IuLYGSGjcA=') no-repeat center center fixed;
+      background-size: cover;
+      position: relative;
+    }
+
+    /* Overlay for readability */
+    body::before {
+      content: "";
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(255, 255, 255, 0.75);
+      z-index: -1;
+    }
+
+    header {
+      background: rgba(0, 123, 255, 0.9);
+      color: white;
+      padding: 20px;
+      text-align: center;
+      border-bottom-left-radius: 12px;
+      border-bottom-right-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    h1 {
+      margin: 0;
+    }
+    .container {
+      display: flex;
+      justify-content: space-around;
+      align-items: flex-start;
+      padding: 40px;
+      gap: 40px;
+      flex-wrap: wrap;
+    }
+    .form-box, .chart-box {
+      background: rgba(255, 255, 255, 0.9);
+      padding: 20px 25px;
+      border-radius: 16px;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.15);
+      backdrop-filter: blur(6px);
+    }
+    .form-box {
+      flex: 1;
+      max-width: 350px;
+      min-width: 280px;
+    }
+    .chart-box {
+      flex: 2;
+      text-align: center;
+      min-width: 320px;
+    }
+    .form-box h2, .chart-box h2 {
+      margin-bottom: 15px;
+      font-size: 20px;
+      color: #007bff;
+    }
+    label {
+      display: block;
+      margin: 10px 0 5px;
+      font-weight: 500;
+    }
+    input[type="number"], input[type="file"] {
+      width: 100%;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+      background: #f9f9fc;
+      transition: 0.3s;
+    }
+    input:focus {
+      border-color: #007bff;
+      outline: none;
+      box-shadow: 0 0 6px rgba(0,123,255,0.3);
+      background: #fff;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      font-size: 16px;
+      font-weight: bold;
+      border: none;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #007bff, #00c6ff);
+      color: white;
+      cursor: pointer;
+      transition: 0.3s ease;
+    }
+    button:hover {
+      background: linear-gradient(135deg, #0056b3, #0096d6);
+      transform: translateY(-2px);
+    }
+    canvas {
+      max-width: 500px;
+      max-height: 500px;
+      margin: auto;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Trip Recording & Analytics Dashboard</h1>
+  </header>
+
+  <div class="container">
+    <!-- Form -->
+    <div class="form-box">
+      <h2>Enter Trip Details</h2>
+      <form id="tripForm">
+        <label for="car">Car Trips:</label>
+        <input type="number" id="car" value="8" min="0" step="1">
+
+        <label for="bus">Bus Trips:</label>
+        <input type="number" id="bus" value="5" min="0" step="1">
+
+        <label for="bike">Bike Trips:</label>
+        <input type="number" id="bike" value="3" min="0" step="1">
+
+        <label for="walk">Walk Trips:</label>
+        <input type="number" id="walk" value="2" min="0" step="1">
+
+        <button type="button" onclick="updateChart()">Update Chart</button>
+
+        <hr style="margin: 20px 0;">
+
+        <label for="excelFile">Upload Excel File (.xlsx):</label>
+        <input type="file" id="excelFile" accept=".xlsx,.xls" />
+      </form>
+    </div>
+
+    <!-- Chart -->
+    <div class="chart-box">
+      <h2>Transport Mode Analytics</h2>
+      <canvas id="transportChart"></canvas>
+    </div>
+  </div>
+
+  <script>
+    const ctx = document.getElementById('transportChart').getContext('2d');
+
+    // initial data
+    let chartData = {
+      labels: ['Car', 'Bus', 'Bike', 'Walk'],
+      datasets: [{
+        label: 'Transport Mode',
+        data: [8, 5, 3, 2],
+        backgroundColor: [
+          'rgba(54, 162, 235, 0.8)',   // Car
+          'rgba(255, 99, 132, 0.8)',   // Bus
+          'rgba(75, 192, 192, 0.8)',   // Bike
+          'rgba(255, 206, 86, 0.8)'    // Walk
+        ],
+        borderColor: [
+          'rgba(54, 162, 235, 1)',
+          'rgba(255, 99, 132, 1)',
+          'rgba(75, 192, 192, 1)',
+          'rgba(255, 206, 86, 1)'
+        ],
+        borderWidth: 2
+      }]
+    };
+
+    // create chart with labels + percentages
+    let transportChart = new Chart(ctx, {
+      type: 'pie',
+      data: chartData,
+      options: {
+        responsive: true,
+        plugins: {
+          legend: {
+            position: 'bottom'
+          },
+          datalabels: {
+            formatter: (value, ctx) => {
+              let sum = ctx.chart.data.datasets[0].data.reduce((a, b) => parseInt(a) + parseInt(b), 0);
+              let percentage = ((value / sum) * 100).toFixed(1) + "%";
+              return ctx.chart.data.labels[ctx.dataIndex] + "\n" + percentage;
+            },
+            color: '#fff',
+            font: {
+              weight: 'bold',
+              size: 14
+            }
+          }
+        }
+      },
+      plugins: [ChartDataLabels]
+    });
+
+    // update chart with form input
+    function updateChart() {
+      const car = parseInt(document.getElementById('car').value) || 0;
+      const bus = parseInt(document.getElementById('bus').value) || 0;
+      const bike = parseInt(document.getElementById('bike').value) || 0;
+      const walk = parseInt(document.getElementById('walk').value) || 0;
+
+      transportChart.data.datasets[0].data = [car, bus, bike, walk];
+      transportChart.update();
+    }
+
+    // Handle Excel file upload and update chart
+    document.getElementById('excelFile').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        const data = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, {type: 'array'});
+
+        // Assume data is in the first sheet
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+
+        // Convert sheet to JSON array of objects
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, {defval: 0});
+
+        // Expecting columns: Car, Bus, Bike, Walk (case-insensitive)
+        let totals = { Car: 0, Bus: 0, Bike: 0, Walk: 0 };
+
+        jsonData.forEach(row => {
+          for (let key in totals) {
+            for (let col in row) {
+              if (col.toLowerCase() === key.toLowerCase()) {
+                let val = parseInt(row[col]);
+                if (!isNaN(val)) totals[key] += val;
+              }
+            }
+          }
+        });
+
+        // Update form inputs with totals
+        document.getElementById('car').value = totals.Car;
+        document.getElementById('bus').value = totals.Bus;
+        document.getElementById('bike').value = totals.Bike;
+        document.getElementById('walk').value = totals.Walk;
+
+        // Update chart
+        transportChart.data.datasets[0].data = [totals.Car, totals.Bus, totals.Bike, totals.Walk];
+        transportChart.update();
+      };
+
+      reader.readAsArrayBuffer(file);
+    });
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>GraphHopper Route Map</title>
+  <meta charset="utf-8" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+</head>
+<body>
+  <div id="map" style="height: 100vh;"></div>
+
+  <script>
+    const apiKey = "dcdbebb0-926c-437d-b8f8-3e307c256ec0"; // replace with your GraphHopper API key
+
+    const map = L.map("map").setView([28.6139, 77.2090], 12);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "&copy; OpenStreetMap contributors",
+    }).addTo(map);
+
+    let userMarker, destMarker, routeLayers = [];
+    let userLat, userLng;
+
+    // 1. Get current location
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        userLat = pos.coords.latitude;
+        userLng = pos.coords.longitude;
+
+        map.setView([userLat, userLng], 14);
+        userMarker = L.marker([userLat, userLng])
+          .addTo(map)
+          .bindPopup("You are here")
+          .openPopup();
+      },
+      (err) => {
+        alert("Could not get location: " + err.message);
+      }
+    );
+
+    // 2. Click to select destination
+    map.on("click", (e) => {
+      const { lat, lng } = e.latlng;
+
+      if (destMarker) map.removeLayer(destMarker);
+      destMarker = L.marker([lat, lng])
+        .addTo(map)
+        .bindPopup("Destination")
+        .openPopup();
+
+      getRoutes(userLat, userLng, lat, lng);
+    });
+
+    // 3. Fetch shortest + alternative routes
+    async function getRoutes(startLat, startLng, endLat, endLng) {
+      // Decide avoid features based on time
+      const currentHour = new Date().getHours();
+      let avoid = "";
+
+      // Example: at 8 AM, avoid highways (main roads)
+      if (currentHour === 8) {
+        avoid = "&avoid=motorway";
+      }
+
+      const url = `https://graphhopper.com/api/1/route?point=${startLat},${startLng}&point=${endLat},${endLng}&vehicle=car&locale=en&points_encoded=false&key=${apiKey}&alternative_route.max_paths=3${avoid}`;
+
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+
+        // Remove old routes
+        routeLayers.forEach((layer) => map.removeLayer(layer));
+        routeLayers = [];
+
+        if (!data.paths) {
+          alert("No routes found");
+          return;
+        }
+
+        data.paths.forEach((path, i) => {
+          const colors = ["blue", "green", "red"];
+          const routeLayer = L.geoJSON(path.points, {
+            style: { color: colors[i % colors.length], weight: 5 },
+          })
+            .addTo(map)
+            .bindPopup(
+              `Route ${i + 1}: ${(path.distance / 1000).toFixed(2)} km, ${(path.time / 60000).toFixed(1)} min`
+            );
+
+          routeLayers.push(routeLayer);
+
+          if (i === 0) {
+            map.fitBounds(routeLayer.getBounds()); // zoom to best route
+          }
+        });
+      } catch (err) {
+        console.error(err);
+        alert("Error fetching route. Please check your API key or quota.");
+      }
+    }
+  </script>
+</body>
+</html>

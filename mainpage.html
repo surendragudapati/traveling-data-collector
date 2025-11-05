@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Local Trip Survey — With Current Location & Aadhaar</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { 
+      font-family: 'Segoe UI', Arial, sans-serif; 
+      margin:0; 
+      padding:0; 
+      color:#333; 
+
+      /* Kerala background */
+      background: url('https://media.istockphoto.com/id/522478216/photo/kerala-backwaters-canoeing.jpg?s=612x612&w=0&k=20&c=p41XTFuLJyfA_8LMcS9SGwWOsYW0opdsce5JS0nH60U=') no-repeat center center fixed;
+      background-size: cover;
+      position: relative;
+    }
+
+    /* Overlay for readability */
+    body::before {
+      content: "";
+      position: fixed;
+      top:0; left:0; right:0; bottom:0;
+      background: rgba(255,255,255,0.6); 
+      z-index: -1;
+    }
+
+    #topMenu { 
+      background: linear-gradient(90deg, #007bff, #00c6ff); 
+      color:white; 
+      padding:12px 24px; 
+      position:sticky; 
+      top:0; 
+      z-index:1000; 
+      display:none; 
+      align-items:center; 
+      justify-content:space-between; 
+      box-shadow:0 4px 10px rgba(0,0,0,0.1); 
+      border-bottom-left-radius:8px; 
+      border-bottom-right-radius:8px; 
+    }
+    #menuButton { background:rgba(255,255,255,0.15); border:none; color:white; padding:8px 18px; font-weight:700; border-radius:8px; cursor:pointer; transition: background 0.3s; }
+    #menuButton:hover { background: rgba(255,255,255,0.3); }
+    #menuDropdown { display:none; position:absolute; top:50px; left:0; background:#fff; color:#007bff; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15); min-width:200px; overflow:hidden; z-index:1001; }
+    #menuDropdown button { width:100%; padding:12px 18px; border:none; background:#fff; color:#007bff; text-align:left; cursor:pointer; font-weight:600; border-bottom:1px solid #f0f0f0; transition: all 0.3s; }
+    #menuDropdown button:last-child { border-bottom:none; }
+    #menuDropdown button:hover { background:#007bff; color:#fff; }
+
+    .card { 
+      max-width:700px; 
+      background: rgba(255, 255, 255, 0.85); 
+      backdrop-filter: blur(10px);
+      margin:25px auto; 
+      padding:25px 30px; 
+      border-radius:16px; 
+      box-shadow:0 6px 20px rgba(0,0,0,0.08); 
+      transition: transform 0.25s, box-shadow 0.25s; 
+    }
+    .card:hover { transform:translateY(-4px); box-shadow:0 12px 30px rgba(0,0,0,0.15); }
+    h2 { margin-top:0; color:#0077c2; font-weight:700; border-bottom:2px solid #f1f1f1; padding-bottom:8px; }
+    label { display:block; margin-top:12px; font-weight:600; }
+    input, select { width:100%; padding:10px; margin-top:6px; border-radius:10px; border:1px solid #ccc; font-size:1rem; transition:border 0.25s, box-shadow 0.25s; }
+    input:focus, select:focus { outline:none; border-color:#007bff; box-shadow:0 0 6px rgba(0,123,255,0.25); background:#fff; }
+    button { width:100%; padding:12px; margin-top:15px; border-radius:10px; border:none; font-weight:700; cursor:pointer; font-size:1rem; background:linear-gradient(135deg,#007bff,#00c6ff); color:#fff; transition: all 0.3s ease; }
+    button:hover { background:linear-gradient(135deg,#0056b3,#0096d6); transform:translateY(-2px); }
+    .inline-row { display:flex; gap:10px; align-items:center; margin-top:6px; }
+    .inline-row input { flex:1; }
+    .inline-btn { width:auto; padding:8px 14px; background:#28a745; color:#fff; border:none; border-radius:8px; cursor:pointer; font-weight:600; transition: all 0.25s; }
+    .inline-btn:hover { background:#218838; transform:translateY(-1px); }
+    .inline-btn[disabled] { opacity:.65; cursor:default; }
+    .status { font-size:13px; margin-left:6px; color:#555; transition:color 0.25s; }
+    #tripQueue div { padding:10px 12px; border-bottom:1px solid #eee; border-left:4px solid #007bff; border-radius:6px; background:#f9faff; margin-bottom:6px; transition:background 0.3s; }
+    #tripQueue div:hover { background:#e6f0ff; }
+    .actions { display:flex; gap:10px; margin-top:15px; }
+    .actions button { flex:1; }
+    @media(max-width:600px){ .inline-row { flex-direction:column; align-items:stretch; } .status { margin-left:0; margin-top:6px; } }
+  </style>
+</head>
+<body>
+<div id="topMenu">
+  <button id="menuButton" aria-haspopup="true" aria-expanded="false" aria-controls="menuDropdown">Menu ▼</button>
+  <div id="menuDropdown" role="menu" aria-label="Main menu">
+    <button type="button" role="menuitem" id="menuAddTrip">Trip Records</button>
+    <button type="button" role="menuitem" id="menuGraph">Graphical Representation</button>
+    <button type="button" role="menuitem" id="menuMap1">Map 1</button>
+    <button type="button" role="menuitem" id="menuMap2">Map 2</button>
+  </div>
+</div>
+
+<div id="consentScreen" class="card">
+  <h2>Local Trip Survey</h2>
+  <p>Please provide consent to share your trip data for survey purposes.</p>
+  <button id="giveConsent">I Consent</button>
+</div>
+
+<div id="tripFormCard" class="card" style="display:none;">
+  <h2>Add a Local Trip</h2>
+  <form id="tripForm" autocomplete="off">
+    <label for="aadhaar">Aadhaar Number:</label>
+    <input type="text" id="aadhaar" placeholder="Enter 12-digit Aadhaar" pattern="\d{12}" title="12 digit Aadhaar number" required />
+
+    <label for="origin">Origin:</label>
+    <div class="inline-row">
+      <input type="text" id="origin" placeholder="Type origin or use current location" required autocomplete="off" />
+      <button type="button" id="currentLocationBtn" class="inline-btn" aria-label="Use current location">📍 Use Current</button>
+      <span id="locStatus" class="status" aria-live="polite"></span>
+    </div>
+    <input type="text" id="originCoords" readonly placeholder="Coordinates will appear here" autocomplete="off" />
+
+    <label for="destination">Destination:</label>
+    <input type="text" id="destination" required autocomplete="off" />
+    <input type="text" id="destCoords" readonly placeholder="Coordinates will appear here" autocomplete="off" />
+
+    <label for="mode">Mode of Transport:</label>
+    <select id="mode" required>
+      <option value="Car">Car</option>
+      <option value="Bike">Bike</option>
+      <option value="Bus">Bus</option>
+      <option value="Auto">Auto</option>
+       <option value="Aeroplane">Aeroplane</option>
+       <option value="Railway">Railway</option>
+      
+      
+    </select>
+
+    <label for="purpose">Purpose:</label>
+    <select id="purpose" required>
+      <option value="Work">Work</option>
+      <option value="Education">Education</option>
+      <option value="Shopping">Shopping</option>
+      <option value="Leisure">Leisure</option>
+    </select>
+
+    <label for="companions">Companions:</label>
+    <input type="text" id="companions" placeholder="e.g. Alone, Friends, Family" autocomplete="off" />
+
+    <label for="departureTime">Departure Time:</label>
+    <input type="datetime-local" id="departureTime" required />
+
+    <label for="arrivalTime">Arrival Time:</label>
+    <input type="datetime-local" id="arrivalTime" required />
+
+    <button type="submit">Add Trip</button>
+  </form>
+</div>
+
+<div id="tripQueueCard" class="card" style="display:none;">
+  <h2>Trip Queue</h2>
+  <div id="tripQueue">No trips yet.</div>
+  <div class="actions">
+    <button id="exportCsv">Export CSV</button>
+    <button id="pushServer">Push to Server</button>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const consentBtn = document.getElementById("giveConsent");
+  const consentScreen = document.getElementById("consentScreen");
+  const tripFormCard = document.getElementById("tripFormCard");
+  const tripQueueCard = document.getElementById("tripQueueCard");
+  const tripForm = document.getElementById("tripForm");
+  const tripQueueEl = document.getElementById("tripQueue");
+
+  const originInput = document.getElementById("origin");
+  const originCoordsInput = document.getElementById("originCoords");
+  const destInput = document.getElementById("destination");
+  const destCoordsInput = document.getElementById("destCoords");
+  const currentLocationBtn = document.getElementById("currentLocationBtn");
+  const locStatus = document.getElementById("locStatus");
+  const aadhaarInput = document.getElementById("aadhaar");
+
+  const menuButton = document.getElementById('menuButton');
+  const menuDropdown = document.getElementById('menuDropdown');
+  const menuAddTrip = document.getElementById('menuAddTrip');
+  const menuGraph = document.getElementById('menuGraph');
+  const menuMap1 = document.getElementById('menuMap1');
+  const menuMap2 = document.getElementById('menuMap2');
+  const topMenu = document.getElementById('topMenu');
+
+  let trips = JSON.parse(localStorage.getItem("trips") || "[]");
+
+  consentBtn.onclick = () => {
+    consentScreen.style.display = "none";
+    tripFormCard.style.display = "block";
+    tripQueueCard.style.display = "block";
+    topMenu.style.display = "flex";
+    renderQueue();
+  };
+
+  menuButton.addEventListener('click', () => {
+    const expanded = menuButton.getAttribute('aria-expanded') === 'true';
+    menuDropdown.style.display = expanded ? 'none' : 'block';
+    menuButton.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+  });
+  document.addEventListener('click', (e) => {
+    if (!menuButton.contains(e.target) && !menuDropdown.contains(e.target)) {
+      menuDropdown.style.display = 'none';
+      menuButton.setAttribute('aria-expanded', 'false');
+    }
+  });
+
+  menuAddTrip.addEventListener('click', () => window.location.href = 'triprec.html');
+  menuGraph.addEventListener('click', () => window.location.href = 'graph.html');
+  menuMap1.addEventListener('click', () => window.location.href = 'map1.html');
+  menuMap2.addEventListener('click', () => window.location.href = 'map2.html');
+
+  async function reverseGeocode(lat, lon) {
+    try { const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`);
+      const data = await res.json(); return data.display_name || `${lat},${lon}`;
+    } catch { return `${lat},${lon}`; }
+  }
+
+  currentLocationBtn.addEventListener('click', () => {
+    if (!navigator.geolocation) { alert('Geolocation not supported'); return; }
+    currentLocationBtn.disabled = true;
+    locStatus.textContent = 'Getting location...';
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      const lat = pos.coords.latitude;
+      const lon = pos.coords.longitude;
+      originCoordsInput.value = `${lat},${lon}`;
+      originInput.value = await reverseGeocode(lat, lon);
+      locStatus.textContent = 'Location set';
+      locStatus.style.color = '#2a8f2a';
+      currentLocationBtn.disabled = false;
+      setTimeout(()=>locStatus.textContent='',3000);
+    }, err=>{
+      locStatus.textContent = 'Failed to get location';
+      locStatus.style.color = '#c0392b';
+      currentLocationBtn.disabled = false;
+      setTimeout(()=>locStatus.textContent='',5000);
+    }, {enableHighAccuracy:true,timeout:10000});
+  });
+
+  async function geocode(place, targetInput) {
+    if(!place) return;
+    try{ const res = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(place)}&limit=1`);
+      const data = await res.json();
+      if(data.length>0) targetInput.value = `${data[0].lat},${data[0].lon}`;
+      else targetInput.value='0,0';
+    } catch { targetInput.value='0,0'; }
+  }
+
+  originInput.addEventListener('blur',()=>geocode(originInput.value,originCoordsInput));
+  destInput.addEventListener('blur',()=>geocode(destInput.value,destCoordsInput));
+
+  function parseCoords(str){ const p=str.split(',').map(Number); return (p.length===2 && !isNaN(p[0]) && !isNaN(p[1]))?p:null; }
+  function calculateDistance(c1,c2){
+    const p1=parseCoords(c1), p2=parseCoords(c2); if(!p1||!p2)return '0.00 km';
+    const R=6371,dLat=(p2[0]-p1[0])*Math.PI/180,dLon=(p2[1]-p1[1])*Math.PI/180;
+    const a=Math.sin(dLat/2)**2+Math.cos(p1[0]*Math.PI/180)*Math.cos(p2[0]*Math.PI/180)*Math.sin(dLon/2)**2;
+    return (R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a))).toFixed(2)+' km';
+  }
+  function calculateTripDuration(dep,arr){ const depD=new Date(dep),arrD=new Date(arr); if(isNaN(depD)||isNaN(arrD)) return 'Invalid'; const diff=arrD-depD; if(diff<0) return 'Invalid'; const mins=Math.floor(diff/60000), hrs=Math.floor(mins/60), remMins=mins%60; return hrs>0?`${hrs}h ${remMins}m`:`${remMins}m`; }
+
+  tripForm.addEventListener('submit',(e)=>{
+    e.preventDefault();
+    if(!/^\d{12}$/.test(aadhaarInput.value)){ alert('Aadhaar must be 12 digits'); return; }
+    const trip={ 
+      tripNumber: trips.length+1, 
+      aadhaar: aadhaarInput.value,
+      origin: originInput.value, originCoords: originCoordsInput.value, 
+      destName: destInput.value, destCoords: destCoordsInput.value, 
+      mode: document.getElementById("mode").value, 
+      purpose: document.getElementById("purpose").value, 
+      companions: document.getElementById("companions").value, 
+      departureTime: document.getElementById("departureTime").value, 
+      arrivalTime: document.getElementById("arrivalTime").value, 
+      distance: calculateDistance(originCoordsInput.value,destCoordsInput.value), 
+      tripDuration: calculateTripDuration(document.getElementById("departureTime").value,document.getElementById("arrivalTime").value) 
+    };
+    trips.push(trip); localStorage.setItem('trips',JSON.stringify(trips));
+    tripForm.reset(); originCoordsInput.value=''; destCoordsInput.value='';
+    renderQueue();
+  });
+
+  function renderQueue(){
+    tripQueueEl.innerHTML = trips.length===0 ? 'No trips yet.' : trips.map(t=>`<div>Trip ${t.tripNumber} | Aadhaar: ${t.aadhaar} | ${t.origin} → ${t.destName} (${t.mode}) | 📏 ${t.distance} | ⌛ ${t.tripDuration}</div>`).join('');
+  }
+
+  document.getElementById('exportCsv').addEventListener('click',()=>{
+    if(trips.length===0){ alert('No trips to export.'); return; }
+    const header=Object.keys(trips[0]).join(',');
+    const rows=trips.map(t=>Object.values(t).map(v=>`"${String(v).replace(/"/g,'""')}"`).join(','));
+    const csv=[header,...rows].join('\n');
+    const blob=new Blob([csv],{type:'text/csv'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='trips.csv'; a.click(); URL.revokeObjectURL(url);
+  });
+
+  document.getElementById('pushServer').addEventListener('click',()=>{
+    if(trips.length===0){ alert('No trips to push.'); return; }
+    alert('Trips would be sent to server here. Total trips: '+trips.length);
+  });
+});
+</script>
+</body>
+</html>
+

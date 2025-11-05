@@ -1,0 +1,253 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Smart Route Finder — demo</title>
+  <meta name="viewport" content="initial-scale=1, width=device-width" />
+  <style>
+    body, html { height: 100%; margin: 0; font-family: Arial, Helvetica, sans-serif; }
+    #map { height: 72%; width: 100%; }
+    #controls { padding: 12px; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.2); }
+    #controls input, #controls button { margin-right: 8px; padding:6px; }
+    .route-card { padding:8px; border-radius:6px; margin:6px 0; background:#f7f7f7; }
+    .selected { border: 2px solid #007bff; }
+  </style>
+</head>
+<body>
+  <div id="controls">
+    <input id="destination" placeholder="Enter destination" size="40"/>
+    <input type="date" id="date" />
+    <input type="time" id="time" />
+    <label><input type="checkbox" id="autoAvoidPeak" checked /> Auto-avoid highways during peaks</label>
+    <button id="go">Find routes</button>
+    <div id="route-info"></div>
+  </div>
+
+  <div id="map"></div>
+
+  <!-- Google Maps JS: replace YOUR_API_KEY -->
+  <script src="https://maps.googleapis.com/maps/api/js?AlzaSyASG7Eg_IYNEdk5yvvYrc64QIHReMXpkAO&libraries=places&callback=initMap" async defer></script>
+
+  <script>
+  let map, trafficLayer, directionsService;
+  let polylines = []; // google.maps.Polyline objects for alternatives
+  let markers = [];    // origin/destination markers
+  const colors = ["#2b9cff","#37c978","#ffb84d","#9b59b6","#d35400"];
+
+  function initMap() {
+    map = new google.maps.Map(document.getElementById('map'), {
+      center: { lat: 20.5937, lng: 78.9629 }, // fallback center (India)
+      zoom: 12,
+    });
+
+    // Traffic overlay
+    trafficLayer = new google.maps.TrafficLayer();
+    trafficLayer.setMap(map);
+
+    directionsService = new google.maps.DirectionsService();
+
+    // Places Autocomplete for destination
+    const destInput = document.getElementById('destination');
+    const ac = new google.maps.places.Autocomplete(destInput, { fields: ["place_id","geometry","name","formatted_address"] });
+
+    // default date/time = today & now+5min
+    const dateInput = document.getElementById('date');
+    const timeInput = document.getElementById('time');
+    const now = new Date();
+    dateInput.value = now.toISOString().slice(0,10);
+    timeInput.value = new Date(now.getTime() + 5*60000).toTimeString().slice(0,5);
+
+    // On click: get current location and calculate
+    document.getElementById('go').addEventListener('click', async () => {
+      const destValue = destInput.value.trim();
+      if (!destValue) { alert('Type destination and select from suggestions.'); return; }
+
+      // Get current position
+      if (!navigator.geolocation) { alert('Geolocation not available'); return; }
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        const origin = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        map.setCenter(origin);
+
+        // build departure time from inputs
+        const date = document.getElementById('date').value;
+        const time = document.getElementById('time').value;
+        let departure = buildDateFromInputs(date, time);
+        if (departure < new Date()) { departure = new Date(); } // departure must be now or future
+
+        // Primary request: show multiple alternatives (may include highways)
+        const mainResult = await routeRequest(origin, destValue, departure, false);
+        if (!mainResult) { alert('No routes found'); return; }
+        showRoutesOnMap(mainResult);
+
+        // If user wants automatic avoidance during morning/evening peaks: call avoid-highways and compare
+        if (document.getElementById('autoAvoidPeak').checked && isPeakHour(departure)) {
+          const avoidResult = await routeRequest(origin, destValue, departure, true);
+          if (avoidResult) {
+            // compare best durations and recommend
+            const bestMain = pickBestRouteIndex(mainResult);
+            const bestAvoid = pickBestRouteIndex(avoidResult);
+            const mainDur = routeDurationSeconds(mainResult.routes[bestMain]);
+            const avoidDur = routeDurationSeconds(avoidResult.routes[bestAvoid]);
+
+            // if avoiding highways is close (<= +5 mins) or faster, prefer it
+            const pref = (avoidDur <= mainDur + 300) ? {type: 'avoid', res: avoidResult, idx: bestAvoid} : {type:'main', res: mainResult, idx: bestMain};
+
+            // redraw using preferred set (highlight)
+            clearPolylines();
+            showRoutesOnMap(pref.res, pref.idx);
+            showRecommendation(pref, mainDur, avoidDur);
+            return;
+          }
+        }
+
+        // otherwise pick best route in mainResult
+        const bestIdx = pickBestRouteIndex(mainResult);
+        highlightRoute(bestIdx);
+        showRecommendation({type:'main', res: mainResult, idx: bestIdx}, null, null);
+      }, (err) => {
+        alert('Geolocation failed: ' + err.message);
+      }, { enableHighAccuracy: true, timeout: 8000 });
+    });
+  }
+
+  function buildDateFromInputs(dateStr, timeStr) {
+    if (!dateStr || !timeStr) return new Date();
+    const [hh, mm] = timeStr.split(':').map(x=>parseInt(x,10));
+    const d = new Date(dateStr + 'T00:00:00');
+    d.setHours(hh, mm, 0, 0);
+    return d;
+  }
+
+  function isPeakHour(dt) {
+    // simple peak windows: 07:30-09:30 and 17:00-19:00 local time
+    const h = dt.getHours();
+    const m = dt.getMinutes();
+    const minutes = h*60 + m;
+    if (minutes >= (7*60+30) && minutes <= (9*60+30)) return true;
+    if (minutes >= (17*60) && minutes <= (19*60)) return true;
+    return false;
+  }
+
+  // Promise wrapper for directionsService.route
+  function routeRequest(origin, destinationTextOrPlace, departureDate, avoidHighways=false) {
+    return new Promise((resolve, reject) => {
+      const request = {
+        origin: origin,
+        destination: destinationTextOrPlace,
+        travelMode: google.maps.TravelMode.DRIVING,
+        provideRouteAlternatives: true,
+        // drivingOptions requires a Date object
+        drivingOptions: {
+          departureTime: departureDate,
+          trafficModel: google.maps.TrafficModel.BEST_GUESS
+        },
+        avoidHighways: avoidHighways
+      };
+      directionsService.route(request, (result, status) => {
+        if (status === google.maps.DirectionsStatus.OK) resolve(result);
+        else { console.error('Directions request failed', status); resolve(null); }
+      });
+    });
+  }
+
+  // draw routes from a DirectionsResult; optional highlightIndex to visually emphasise
+  function showRoutesOnMap(directionsResult, highlightIndex = null) {
+    clearPolylines();
+    clearMarkers();
+
+    // place origin/destination markers from the first route leg
+    const leg0 = directionsResult.routes[0].legs[0];
+    const start = leg0.start_location;
+    const end = leg0.end_location;
+    markers.push(new google.maps.Marker({ position: start, map: map, title: 'Start' }));
+    markers.push(new google.maps.Marker({ position: end, map: map, title: 'Destination' }));
+
+    // draw each alternative as a polyline
+    directionsResult.routes.forEach((route, i) => {
+      const poly = new google.maps.Polyline({
+        path: route.overview_path,
+        strokeColor: colors[i % colors.length],
+        strokeOpacity: (i === highlightIndex ? 0.95 : 0.6),
+        strokeWeight: (i === highlightIndex ? 7 : 5),
+        map: map,
+        zIndex: (i === highlightIndex ? 100 : 50)
+      });
+      polylines.push(poly);
+
+      // attach click info window with duration and distance
+      const durText = (route.legs[0].duration_in_traffic ? route.legs[0].duration_in_traffic.text : route.legs[0].duration.text);
+      const distText = route.legs[0].distance ? route.legs[0].distance.text : '';
+      const info = new google.maps.InfoWindow({
+        content: `<div class="route-card"><b>Route ${i+1}</b><br/>${durText} — ${distText}<br/><small>Summary: ${route.summary || '—'}</small></div>`
+      });
+      poly.addListener('click', () => {
+        info.setPosition(route.overview_path[Math.floor(route.overview_path.length/2)]);
+        info.open({ map });
+        highlightRoute(i);
+      });
+
+      // add a small textual summary to controls area for quick selection
+      const rDiv = document.createElement('div');
+      rDiv.className = 'route-card';
+      if (i === highlightIndex) rDiv.classList.add('selected');
+      const secs = routeDurationSeconds(route);
+      rDiv.innerHTML = `<b>Route ${i+1}</b> — ${durText} — ${distText} — est ${Math.round(secs/60)} min`;
+      rDiv.addEventListener('click', () => { highlightRoute(i); info.setPosition(route.overview_path[Math.floor(route.overview_path.length/2)]); info.open({ map }); });
+      document.getElementById('route-info').appendChild(rDiv);
+    });
+  }
+
+  function routeDurationSeconds(route) {
+    const leg = route.legs[0];
+    if (leg.duration_in_traffic && leg.duration_in_traffic.value) return leg.duration_in_traffic.value;
+    if (leg.duration && leg.duration.value) return leg.duration.value;
+    return Infinity;
+  }
+
+  function pickBestRouteIndex(directionsResult) {
+    let bestIdx = 0;
+    let best = Infinity;
+    directionsResult.routes.forEach((rt, i) => {
+      const secs = routeDurationSeconds(rt);
+      if (secs < best) { best = secs; bestIdx = i; }
+    });
+    return bestIdx;
+  }
+
+  function highlightRoute(index) {
+    // increase thickness/opacity of selected route and dim others
+    polylines.forEach((pl, i) => {
+      pl.setOptions({
+        strokeOpacity: (i === index ? 0.95 : 0.35),
+        strokeWeight: (i === index ? 8 : 4),
+        zIndex: (i === index ? 200 : 50)
+      });
+    });
+    // update UI selection class
+    Array.from(document.querySelectorAll('#route-info .route-card')).forEach((el, i) => {
+      el.classList.toggle('selected', i === index);
+    });
+  }
+
+  function clearPolylines() {
+    polylines.forEach(pl => pl.setMap(null));
+    polylines = [];
+    document.getElementById('route-info').innerHTML = '';
+  }
+  function clearMarkers() { markers.forEach(m => m.setMap(null)); markers = []; }
+
+  function showRecommendation(pref, mainDur, avoidDur) {
+    const el = document.getElementById('route-info');
+    const msg = document.createElement('div');
+    msg.style.marginTop = '6px';
+    if (pref.type === 'avoid') {
+      msg.innerHTML = `<b>Recommendation:</b> Avoid highways (recommended for selected time). Avoid-route ETA: ${Math.round(routeDurationSeconds(pref.res.routes[pref.idx])/60)} min.`;
+    } else {
+      msg.innerHTML = `<b>Recommendation:</b> Fastest route selected. ETA: ${Math.round(routeDurationSeconds(pref.res.routes[pref.idx])/60)} min.`;
+    }
+    el.prepend(msg);
+  }
+
+  </script>
+</body>
+</html>

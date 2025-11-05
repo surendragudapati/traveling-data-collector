@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TravelWorld - Login & Signup</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="icon" href="favicon.ico" type="image/x-icon">
+    <meta name="description" content="TravelWorld - Discover Amazing Places. Login or Sign up to explore.">
+</head>
+<body>
+    <div class="container">
+        <!-- Background Image Carousel -->
+        <div class="background-carousel">
+            <div class="background-image active" style="background-image: url('https://images.pexels.com/photos/789750/pexels-photo-789750.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1280&fit=crop');"></div>
+            <div class="background-image" style="background-image: url('https://images.pexels.com/photos/3844788/pexels-photo-3844788.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1280&fit=crop');"></div>
+            <div class="background-image" style="background-image: url('https://images.pexels.com/photos/1583339/pexels-photo-1583339.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1280&fit=crop');"></div>
+            <div class="background-image" style="background-image: url('https://images.pexels.com/photos/460376/pexels-photo-460376.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1280&fit=crop');"></div>
+            <div class="background-image" style="background-image: url('https://images.pexels.com/photos/2404843/pexels-photo-2404843.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1280&fit=crop');"></div>
+            <div class="background-image" style="background-image: url('https://images.pexels.com/photos/1319429/pexels-photo-1319429.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1280&fit=crop');"></div>
+            <div class="background-image" style="background-image: url('https://images.pexels.com/photos/2422915/pexels-photo-2422915.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1280&fit=crop');"></div>
+            <div class="background-image" style="background-image: url('https://images.pexels.com/photos/1680247/pexels-photo-1680247.jpeg?auto=compress&cs=tinysrgb&w=1920&h=1280&fit=crop');"></div>
+        </div>
+        
+        <!-- Overlay -->
+        <div class="overlay"></div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="auth-container">
+                <!-- Logo/Brand -->
+                <div class="brand">
+                    <div class="logo">
+                        <i class="fas fa-plane"></i>
+                    </div>
+                    <h1>TravelWorld</h1>
+                    <p>Discover Amazing Places</p>
+                </div>
+
+                <!-- Auth Form -->
+                <div class="auth-form">
+                    <!-- Toggle Buttons -->
+                    <div class="toggle-buttons">
+                        <button id="loginBtn" class="toggle-btn active" type="button">Login</button>
+                        <button id="signupBtn" class="toggle-btn" type="button">Sign Up</button>
+                    </div>
+
+                    <!-- Login Form -->
+                    <form id="loginForm" class="form active">
+                        <div class="input-group">
+                            <i class="fas fa-envelope"></i>
+                            <label for="loginEmail" class="sr-only">Email Address</label>
+                            <input type="email" id="loginEmail" placeholder="Email Address" required>
+                        </div>
+
+                        <div class="input-group">
+                            <i class="fas fa-lock"></i>
+                            <label for="loginPassword" class="sr-only">Password</label>
+                            <input type="password" id="loginPassword" placeholder="Password" required>
+                            <button type="button" class="password-toggle" onclick="togglePassword('loginPassword')">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+
+                        <button type="submit" class="submit-btn">Sign In</button>
+
+                        <div class="forgot-password">
+                            <a href="#">Forgot your password?</a>
+                        </div>
+                    </form>
+
+                    <!-- Signup Form -->
+                    <form id="signupForm" class="form">
+                        <div class="name-row">
+                            <div class="input-group">
+                                <i class="fas fa-user"></i>
+                                <label for="firstName" class="sr-only">First Name</label>
+                                <input type="text" id="firstName" placeholder="First Name" required>
+                            </div>
+                            <div class="input-group">
+                                <i class="fas fa-user"></i>
+                                <label for="lastName" class="sr-only">Last Name</label>
+                                <input type="text" id="lastName" placeholder="Last Name" required>
+                            </div>
+                        </div>
+
+                        <div class="input-group">
+                            <i class="fas fa-envelope"></i>
+                            <label for="signupEmail" class="sr-only">Email Address</label>
+                            <input type="email" id="signupEmail" placeholder="Email Address" required>
+                        </div>
+
+                        <div class="input-group">
+                            <i class="fas fa-lock"></i>
+                            <label for="signupPassword" class="sr-only">Password</label>
+                            <input type="password" id="signupPassword" placeholder="Password" required>
+                            <button type="button" class="password-toggle" onclick="togglePassword('signupPassword')">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+
+                        <div class="input-group">
+                            <i class="fas fa-lock"></i>
+                            <label for="confirmPassword" class="sr-only">Confirm Password</label>
+                            <input type="password" id="confirmPassword" placeholder="Confirm Password" required>
+                            <button type="button" class="password-toggle" onclick="togglePassword('confirmPassword')">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+
+                        <div class="input-group">
+                            <i class="fas fa-phone"></i>
+                            <label for="phone" class="sr-only">Phone Number</label>
+                            <input type="tel" id="phone" placeholder="Phone Number" required>
+                        </div>
+
+                        <div class="input-group">
+                            <i class="fas fa-map-marker-alt"></i>
+                            <label for="country" class="sr-only">Select Country</label>
+                            <select id="country" required>
+                                <option value="">Select Country</option>
+                                <option value="India">India</option>
+                                <option value="United States">United States</option>
+                                <option value="United Kingdom">United Kingdom</option>
+                                <option value="France">France</option>
+                                <option value="Germany">Germany</option>
+                                <option value="Italy">Italy</option>
+                                <option value="Spain">Spain</option>
+                                <option value="Japan">Japan</option>
+                                <option value="China">China</option>
+                                <option value="Australia">Australia</option>
+                                <option value="Canada">Canada</option>
+                                <option value="Brazil">Brazil</option>
+                                <option value="Russia">Russia</option>
+                                <option value="South Korea">South Korea</option>
+                                <option value="Mexico">Mexico</option>
+                                <option value="Thailand">Thailand</option>
+                                <option value="Turkey">Turkey</option>
+                                <option value="Greece">Greece</option>
+                                <option value="Egypt">Egypt</option>
+                                <option value="United Arab Emirates">United Arab Emirates</option>
+                            </select>
+                        </div>
+
+                        <button type="submit" class="submit-btn">Create Account</button>
+                    </form>
+
+                    <!-- Switch Form Text -->
+                    <div class="switch-form">
+                        <p id="switchText">Don't have an account? <a id="switchBtn" href="#">Sign up now</a></p>
+                    </div>
+                </div>
+
+                <!-- Footer -->
+                <div class="footer">
+                    <p>By continuing, you agree to our Terms of Service and Privacy Policy</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

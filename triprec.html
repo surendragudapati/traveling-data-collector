@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Auto Trip Logger</title>
+  <style>
+    body {
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      background: linear-gradient(135deg, #e3f2fd, #fce4ec);
+      margin: 0; padding: 20px; color: #333;
+    }
+    .card {
+      max-width: 650px;
+      background: #ffffff;
+      margin: 20px auto;
+      padding: 25px 30px;
+      border-radius: 16px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .card:hover { transform: translateY(-3px); box-shadow: 0 12px 28px rgba(0,0,0,0.12); }
+    h2 { margin-top: 0; color: #0077c2; font-weight: 600; border-bottom: 2px solid #f1f1f1; padding-bottom: 8px; }
+    label { display: block; margin-top: 12px; font-weight: 600; color: #444; font-size: 0.95rem; }
+    select { width: 100%; padding: 10px; margin-top: 6px; border-radius: 8px; border: 1px solid #ccc; background: #fafafa; font-size: 1rem; transition: border 0.2s; }
+    select:focus { outline: none; border-color: #007bff; background: #fff; }
+    .actions { display: flex; gap: 15px; margin-top: 20px; }
+    button { flex: 1; padding: 12px; font-size: 1rem; border-radius: 10px; border: none; cursor: pointer; font-weight: 600; transition: all 0.25s ease; }
+    #startTrip { background: linear-gradient(135deg, #4caf50, #66bb6a); color: #fff; }
+    #startTrip:hover { background: linear-gradient(135deg, #43a047, #5aae63); transform: translateY(-2px); }
+    #endTrip { background: linear-gradient(135deg, #e53935, #ef5350); color: #fff; }
+    #endTrip:disabled { background: #ccc; cursor: not-allowed; }
+    #endTrip:hover:enabled { background: linear-gradient(135deg, #d32f2f, #e53935); transform: translateY(-2px); }
+    #tripLog { font-size: 0.95rem; line-height: 1.6; }
+    #tripLog div { padding: 12px 10px; margin: 8px 0; background: #fafafa; border-left: 4px solid #0077c2; border-radius: 6px; transition: background 0.2s; white-space: pre-wrap; }
+    #tripLog div:hover { background: #f0f8ff; }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <h2>Automatic Trip Logger</h2>
+  <label for="mode">Select Mode of Transport:</label>
+  <select id="mode">
+    <option value="Car">Car</option>
+    <option value="Bike">Bike</option>
+    <option value="Bus">Bus</option>
+    <option value="Auto">Auto</option>
+  </select>
+  <div class="actions">
+    <button id="startTrip">Start Trip</button>
+    <button id="endTrip" disabled>End Trip</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Trip Log</h2>
+  <div id="tripLog">No trips yet.</div>
+</div>
+
+<script>
+let tripStart = null;
+let startCoords = null;
+
+const startBtn = document.getElementById("startTrip");
+const endBtn = document.getElementById("endTrip");
+const tripLog = document.getElementById("tripLog");
+const modeSelect = document.getElementById("mode");
+
+const fareRates = { Car: 15, Bike: 5, Bus: 3, Auto: 10 };
+
+function getCurrentLocation() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) return reject("Geolocation not supported");
+    navigator.geolocation.getCurrentPosition(
+      pos => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
+      err => reject("Unable to fetch location: " + err.message)
+    );
+  });
+}
+
+function calculateDistance(c1, c2) {
+  const R = 6371; // km
+  const dLat = (c2.lat - c1.lat) * Math.PI / 180;
+  const dLon = (c2.lon - c1.lon) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 +
+            Math.cos(c1.lat * Math.PI / 180) *
+            Math.cos(c2.lat * Math.PI / 180) *
+            Math.sin(dLon / 2) ** 2;
+  return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+
+function formatDuration(ms) {
+  const mins = Math.floor(ms / 60000);
+  const hrs = Math.floor(mins / 60);
+  const remMins = mins % 60;
+  return hrs > 0 ? `${hrs}h ${remMins}m` : `${remMins}m`;
+}
+
+startBtn.addEventListener("click", async () => {
+  try {
+    startCoords = await getCurrentLocation();
+    tripStart = new Date();
+    startBtn.disabled = true;
+    endBtn.disabled = false;
+
+    const startMsg = document.createElement("div");
+    startMsg.textContent = `🏁 Trip started at ${tripStart.toLocaleTimeString()} | Mode: ${modeSelect.value}`;
+    tripLog.appendChild(startMsg);
+
+  } catch (err) {
+    alert(err);
+  }
+});
+
+endBtn.addEventListener("click", async () => {
+  if (!tripStart || !startCoords) {
+    alert("Please start a trip first.");
+    return;
+  }
+
+  try {
+    const endCoords = await getCurrentLocation();
+    const tripEnd = new Date();
+    const duration = tripEnd - tripStart;
+    const distance = calculateDistance(startCoords, endCoords).toFixed(2);
+    const mode = modeSelect.value;
+    const fare = (distance * fareRates[mode]).toFixed(2);
+
+    if (tripLog.textContent.trim() === "No trips yet.") tripLog.textContent = "";
+
+    const tripEntry = document.createElement("div");
+    tripEntry.textContent = 
+      `🚗 Mode: ${mode} | 📏 Distance: ${distance} km | ⌛ Duration: ${formatDuration(duration)} | 💰 Fare: ₹${fare}`;
+    tripLog.appendChild(tripEntry);
+
+    startBtn.disabled = false;
+    endBtn.disabled = true;
+    tripStart = null;
+    startCoords = null;
+
+  } catch (err) {
+    alert(err);
+  }
+});
+</script>
+
+</body>
+</html>
